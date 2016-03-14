@@ -1,9 +1,13 @@
 template <typename Comparable>
-
 class BinaryHeap
 {
 public:
-	explicit BinaryHeap(int capacity = 100);
+    explicit BinaryHeap(int capacity = 100)
+        : _array()
+    {
+        _array.reserve(capacity);
+    }
+
 	explicit BinaryHeap(const vector<Comparable> & items)
 		: _array(items.size() + 10), currentSize{ items.size() }
 	{
@@ -12,25 +16,36 @@ public:
 		buildHeap();
 	}
 
-	bool isEmpty() const;
-	const Comparable & findMin() const;
+    bool isEmpty() const
+    {
+        return _currrentSize == 0;
+    }
+
+    const Comparable & findMin() const
+    {
+        return _array[0];
+    }
 
 	void insert(const Comparable & x)
 	{
-		if (currentSize == array.size() - 1)
-			array.resize(array.size() * 2);
-
-		// Percolate up
-		int hole = ++currentSize;
-		Comparable copy = x;
-
-		_array[0] = std::move(copy);
-		for (; x < _array[hole / 2]; hole /= 2)
-			_array[hole] = std::move(_array[hole / 2]);
-		_array[hole] = std::move(_array[0]);
-
+        Comparable copy(x);
+        insert(std::move(copy));
 	}
-	void insert(Comparable && x);
+
+    void insert(Comparable && x)
+    {
+        if (currentSize == _array.size() - 1)
+            _array.resize(_array.size() * 2);
+
+        // Percolate up
+        int hole = ++currentSize;
+
+        _array[0] = std::move(x);
+        for (; x < _array[hole / 2]; hole /= 2)
+            _array[hole] = std::move(_array[hole / 2]);
+        _array[hole] = std::move(_array[0]);
+    }
+
 	void deleteMin()
 	{
 		if (isEmpty())
@@ -48,7 +63,12 @@ public:
 		_array[1] = std::move(_array[currentSize--]);
 		percolateDown(1);
 	}
-	void makeEmpty();
+
+    void makeEmpty()
+    {
+        _array.clear();
+        _currentSize = 0;
+    }
 
 private:
 	int _currentSize; // Number of elements in heap

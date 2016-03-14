@@ -1,0 +1,15 @@
+Questions
+=========
+2. (7.12)
+Heapsort always runs in O(n * logn), so the running time on already-sorted input is O(n * logn).
+
+4. (6.38)
+To decrease all the keys in constant time, a variable holding delta can be added to the heap and
+update every time the decreaseAllKeys() operation is performed. When looking for a key, this value
+is added to the key to get the actual key for which to search.
+
+5. (9.26)
+Every vertex except for F can reach any other vertex in the graph, so the first strongly connected
+component consists of A, B, C, D, E, and G. F is the other strongly connected component, since it's
+possible to get to F from F.
+
