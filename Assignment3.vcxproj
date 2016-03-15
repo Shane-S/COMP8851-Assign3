@@ -112,9 +112,11 @@
   <ItemGroup>
     <ClInclude Include="BinaryHeap.hpp" />
     <ClInclude Include="CuckooHashTable.hpp" />
+    <ClInclude Include="MurmurHash2.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="MurmurHash2.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

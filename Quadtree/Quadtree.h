@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include "Actor.h"
+#include "GameManager.h"
 
 // Based on http://gamedevelopment.tutsplus.com/tutorials/quick-tip-use-quadtrees-to-detect-likely-collisions-in-2d-space--gamedev-374
 class Quadtree
@@ -33,6 +34,8 @@ public:
 
     // If only a single index is indicated, returns that; otherwise, returns -1
     int getChildIndex(std::uint32_t indices) const;
+
+    void draw(GameManager *mgr);
 
 private:
     int level_;

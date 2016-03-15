@@ -1,6 +1,6 @@
 #include "Quadtree.h"
 
-const int Quadtree::MAX_LEVELS = 3;
+const int Quadtree::MAX_LEVELS = 5;
 const int Quadtree::DIVIDE_THRESHOLD = 10;
 
 #define IDX_0 0x00000001
@@ -91,6 +91,27 @@ int Quadtree::getChildIndex(std::uint32_t indices) const
         else if ((indices & 0xffffffff) == IDX_2) return 2;
         else if ((indices & 0xffffffff) == IDX_3) return 3;
         else                                      return -1;
+    }
+}
+
+void Quadtree::draw(GameManager * mgr)
+{
+    if (!actors_.empty())
+    {
+        SDL_Point points[8];
+        SDL2pp::Renderer &rend = mgr->GetRenderer();
+
+        rend.SetScale(2, 2);
+        rend.SetDrawColor(10 * level_, 10 * level_, 10 * level_, 255);
+        rend.DrawRect(bounds_);
+        SDL_RenderSetScale(rend.Get(), 1, 1);
+    }
+    if (children_[0] != nullptr)
+    {
+        children_[0]->draw(mgr);
+        children_[1]->draw(mgr);
+        children_[2]->draw(mgr);
+        children_[3]->draw(mgr);
     }
 }
 

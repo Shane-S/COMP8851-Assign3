@@ -21,9 +21,15 @@
     <ClInclude Include="CuckooHashTable.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MurmurHash2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MurmurHash2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,3 +1,6 @@
+#include <vector>
+using std::vector;
+
 template <typename Comparable>
 class BinaryHeap
 {
@@ -9,49 +12,57 @@ public:
     }
 
 	explicit BinaryHeap(const vector<Comparable> & items)
-		: _array(items.size() + 10), currentSize{ items.size() }
+		: _array(items.size() + 10), _currentSize{ (int)items.size() }
 	{
-		for (int i = 0; i < items.size(); ++i)
+		for (size_t i = 0; i < items.size(); ++i)
 			_array[i + 1] = items[i];
 		buildHeap();
 	}
 
     bool isEmpty() const
     {
-        return _currrentSize == 0;
+        return _currentSize == 0;
     }
 
     const Comparable & findMin() const
     {
-        return _array[0];
+        return _array[1];
     }
 
 	void insert(const Comparable & x)
 	{
-        Comparable copy(x);
-        insert(std::move(copy));
+        if (_currentSize == _array.size() - 1)
+            _array.resize(_array.size() * 2);
+
+        // Percolate up
+        int hole = ++_currentSize;
+
+        for (; x < _array[hole / 2]; hole /= 2)
+            _array[hole] = std::move(_array[hole / 2]);
+        
+        _array[0] = _array[hole] = x;
 	}
 
     void insert(Comparable && x)
     {
-        if (currentSize == _array.size() - 1)
+        if (_currentSize == _array.size() - 1)
             _array.resize(_array.size() * 2);
 
         // Percolate up
-        int hole = ++currentSize;
+        int hole = ++_currentSize;
 
         _array[0] = std::move(x);
         for (; x < _array[hole / 2]; hole /= 2)
             _array[hole] = std::move(_array[hole / 2]);
-        _array[hole] = std::move(_array[0]);
+        _array[hole] = _array[0];
     }
 
 	void deleteMin()
 	{
 		if (isEmpty())
-			throw UnderflowException{};
+            throw std::underflow_error{ "Can't delete min from empty heap!" };
 
-		_array[1] = std::move(_array[currentSize--]);
+		_array[1] = std::move(_array[_currentSize--]);
 		percolateDown(1);
 	}
 	void deleteMin(Comparable & minItem)
@@ -64,10 +75,20 @@ public:
 		percolateDown(1);
 	}
 
+    Comparable getLastInserted() const
+    {
+        return _array[0];
+    }
+
     void makeEmpty()
     {
         _array.clear();
         _currentSize = 0;
+    }
+
+    int size() const
+    {
+        return _currentSize;
     }
 
 private:
@@ -76,7 +97,7 @@ private:
 
 	void buildHeap()
 	{
-		for (int i = currentSize / 2; i > 0; --i)
+		for (int i = _currentSize / 2; i > 0; --i)
 			percolateDown(i);
 	}
 
@@ -85,10 +106,10 @@ private:
 		int child;
 		Comparable tmp = std::move(_array[hole]);
 
-		for (; hole * 2 <= currentSize; hole = child)
+		for (; hole * 2 <= _currentSize; hole = child)
 		{
 			child = hole * 2;
-			if (child != currentSize && _array[child + 1] < _array[child])
+			if (child != _currentSize && _array[child + 1] < _array[child])
 				++child;
 			if (_array[child] < tmp)
 				_array[hole] = std::move(_array[child]);

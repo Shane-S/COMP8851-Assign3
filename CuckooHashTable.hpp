@@ -5,6 +5,7 @@
 #include <random>
 #include <string>
 #include <cstdint>
+#include "MurmurHash2.h"
 
 #define MAX_LOAD 0.50
 
@@ -31,47 +32,9 @@ class CuckooHashFamily
         // MurmurHash2 (See https://sites.google.com/site/murmurhash/, MurmurHash2_64.cpp)
         std::uint64_t hash(const AnyType & x, int which) const
         {
-            const uint64_t m = 0xc6a4a7935bd1e995;
-            const int r = 47;
-
             const std::uint64_t len = sizeof(x); // Assume 8-bit bytes
             std::uint64_t seed = which == 0 ? seed1_ : seed2_;
-            std::uint64_t h = seed ^ (len * m);
-
-            const std::uint64_t * data = (const uint64_t *)&x;
-            const std::uint64_t * end = data + (len / 8);
-
-            while (data != end)
-            {
-                uint64_t k = *data++;
-
-                k *= m;
-                k ^= k >> r;
-                k *= m;
-
-                h ^= k;
-                h *= m;
-            }
-
-            const unsigned char * data2 = (const unsigned char*)data;
-
-            switch (len & 7)
-            {
-            case 7: h ^= std::uint64_t(data2[6]) << 48;
-            case 6: h ^= std::uint64_t(data2[5]) << 40;
-            case 5: h ^= std::uint64_t(data2[4]) << 32;
-            case 4: h ^= std::uint64_t(data2[3]) << 24;
-            case 3: h ^= std::uint64_t(data2[2]) << 16;
-            case 2: h ^= std::uint64_t(data2[1]) << 8;
-            case 1: h ^= std::uint64_t(data2[0]);
-                h *= m;
-            };
-
-            h ^= h >> r;
-            h *= m;
-            h ^= h >> r;
-
-            return h;
+            return MurmurHash64((const void*)&x, len, seed);
         }
 
         void regenerate()

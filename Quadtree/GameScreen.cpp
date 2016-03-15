@@ -5,7 +5,7 @@
 #include "SquareActor.h"
 #include "Vector2.h"
 
-#define MAX_SPEED 400
+#define MAX_SPEED 1
 
 std::shared_ptr<Level> GameScreen::GetLevel() const
 {
@@ -26,7 +26,7 @@ int GameScreen::Load()
 
     // Generate a bunch of squares with random speeds and start positions
     std::shared_ptr<SDL2pp::Texture> square(new SDL2pp::Texture(_mgr->GetRenderer(), "./Assets/Square.png"));
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < 11; ++i)
     {
         std::unordered_map<std::string, std::shared_ptr<SpriteSheet>> sprites;
         sprites["square"] = std::shared_ptr<SpriteSheet>(new SpriteSheet(square, 1, std::numeric_limits<double>::infinity(), false));
@@ -36,7 +36,7 @@ int GameScreen::Load()
         _level->AddActor(actor);
     }
 
-    _quadtree = std::shared_ptr<Quadtree>(new Quadtree(0, SDL2pp::Rect(SDL2pp::Point(0, 0), viewportSize)));
+    _quadtree = std::shared_ptr<Quadtree>(new Quadtree(1, SDL2pp::Rect(SDL2pp::Point(0, 0), viewportSize)));
 
     _font = std::shared_ptr<SDL2pp::Font>(new SDL2pp::Font("./Assets/BEBAS.ttf", 45));
 
@@ -130,7 +130,7 @@ void GameScreen::Draw()
 	{
 		actor->Draw(*_camera);
 	}
-
+    _quadtree->draw(_mgr);
     rend.Copy(quadtreeUsageMsg, SDL2pp::NullOpt, SDL2pp::Point(5, 5));
 	rend.Present();
 }

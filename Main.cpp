@@ -1,5 +1,6 @@
 #include <iostream>
 #include "CuckooHashTable.hpp"
+#include "BinaryHeap.hpp"
 
 struct SimpleStruct
 {
@@ -32,9 +33,28 @@ void CuckooHashTest()
     }
 }
 
+void BinaryHeapTest()
+{
+    std::vector<int> ints{ 3, 6, 9, 12, 8, 11 };
+    BinaryHeap<int> heap(ints);
+    heap.insert(1);
+    int sixteen = 16;
+    heap.insert(sixteen);
+    int size = heap.size();
+    for (int i = 0; i < size; i++)
+    {
+        int elem = heap.findMin();
+        heap.deleteMin();
+        std::cout << elem << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "Last inserted: " << heap.getLastInserted() << std::endl;
+}
+
 int main(void)
 {    
     CuckooHashTest();
+    BinaryHeapTest();
     std::cin.get();
     return 0;
 }
