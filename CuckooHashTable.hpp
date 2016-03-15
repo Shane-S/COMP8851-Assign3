@@ -4,32 +4,114 @@
 #include <utility>
 #include <random>
 #include <string>
+#include <cstdint>
 
+#define MAX_LOAD 0.50
+
+// Generic hash function that hashes the contents of x (treating x as an array of bytes)
+// Most classes should probably specialise this
 template <typename AnyType>
 class CuckooHashFamily
 {
     public:
-        size_t hash(const AnyType & x, int which) const;
-        int getNumberOfFunctions();
-        void generateNewFunctions();
+        CuckooHashFamily()
+        {
+            // Could loop infinitely, but probably won't
+            do
+            {
+                seed1_ = rand();
+            } while (seed1_ == 0);
+                
+            do
+            {
+                seed2_ = rand();
+            } while (seed2_ == seed1_ || seed2_ == 0);
+        }
+        
+        // MurmurHash2 (See https://sites.google.com/site/murmurhash/, MurmurHash2_64.cpp)
+        std::uint64_t hash(const AnyType & x, int which) const
+        {
+            const uint64_t m = 0xc6a4a7935bd1e995;
+            const int r = 47;
+
+            const std::uint64_t len = sizeof(x); // Assume 8-bit bytes
+            std::uint64_t seed = which == 0 ? seed1_ : seed2_;
+            std::uint64_t h = seed ^ (len * m);
+
+            const std::uint64_t * data = (const uint64_t *)&x;
+            const std::uint64_t * end = data + (len / 8);
+
+            while (data != end)
+            {
+                uint64_t k = *data++;
+
+                k *= m;
+                k ^= k >> r;
+                k *= m;
+
+                h ^= k;
+                h *= m;
+            }
+
+            const unsigned char * data2 = (const unsigned char*)data;
+
+            switch (len & 7)
+            {
+            case 7: h ^= std::uint64_t(data2[6]) << 48;
+            case 6: h ^= std::uint64_t(data2[5]) << 40;
+            case 5: h ^= std::uint64_t(data2[4]) << 32;
+            case 4: h ^= std::uint64_t(data2[3]) << 24;
+            case 3: h ^= std::uint64_t(data2[2]) << 16;
+            case 2: h ^= std::uint64_t(data2[1]) << 8;
+            case 1: h ^= std::uint64_t(data2[0]);
+                h *= m;
+            };
+
+            h ^= h >> r;
+            h *= m;
+            h ^= h >> r;
+
+            return h;
+        }
+
+        void regenerate()
+        {
+            std::uint64_t prev_seed1 = seed1_;
+            std::uint64_t prev_seed2 = seed2_;
+
+            // Could loop infinitely, but probably won't
+            do
+            {
+                seed1_ = rand();
+            } while (seed1_ == 0 || seed1_ == prev_seed1);
+
+            do
+            {
+                seed2_ = rand();
+            } while (seed2_ == seed1_ || seed2_ == 0 || seed2_ == prev_seed2);
+        }
+
+private:
+    std::uint64_t seed1_;
+    std::uint64_t seed2_;
 };
 
-template<typename AnyType, typename HashFamily>
+template<typename AnyType, typename HashFamily = CuckooHashFamily<AnyType>>
 class CuckooHashTable
 {
 public:
-public:
     explicit CuckooHashTable(std::size_t size = 101)
-        : entries_(nextPrime(size))
+        : tableSize_(nextPrime(size)),
+          currentSize_(0),
+          rehashes_(0),
+          entries_(tableSize_ * 2)
     {
-        numHashFunctions_ = hashFunctions_.getNumberOfFunctions();
-        rehashes_ = 0;
         makeEmpty();
     }
     
     void makeEmpty()
     {
-        currentSize = 0;
+        currentSize_ = 0;
         for (auto & entry : entries_)
             entry.isActive = false;
     }
@@ -39,14 +121,15 @@ public:
         return findPos(x) != -1;
     }
     
+    // Pre-condition: x is actually in the table
     bool remove(const AnyType & x)
     {
         int currentPos = findPos(x);
         if (!isActive(currentPos))
             return false;
         
-            entries_[currentPos].isActive = false;
-        --currentSize;
+        entries_[currentPos].isActive = false;
+        --currentSize_;
         return true;
     }
 
@@ -55,9 +138,10 @@ public:
         if (contains(x))
             return false;
         
-        if (currentSize >= array.size() * MAX_LOAD)
+        if (currentSize_ >= entries_.size() * MAX_LOAD)
             expand();
         
+        currentSize_++;
         return insertHelper1(x);
     }
 
@@ -66,9 +150,10 @@ public:
         if (contains(x))
             return false;
 
-        if (currentSize >= array.size() * MAX_LOAD)
+        if (currentSize_ >= entries_.size() * MAX_LOAD)
             expand();
 
+        currentSize_++;
         return insertHelper1(x);
     }
 
@@ -88,114 +173,117 @@ private:
     bool insertHelper1(const AnyType & xx)
     {
         AnyType x = xx;
-        insertHelper1(std::move(x));
+        return insertHelper1(std::move(x));
     }
 
     bool insertHelper1(AnyType && xx)
     {
-        const int COUNT_LIMIT = 100;
-        while (true)
+        const int EVICTION_LIMIT = 30; // Number of times we'll try to insert something before rehashing or expanding
+
+        AnyType curElem(std::move(xx));
+        int curHash = 0;
+        int curTable = 0;
+        int insertPos = 0;
+        int evictions = 0;
+        bool evicted;
+
+        do
         {
-            int lastPos = -1;
-            int pos;
+            AnyType toInsert = std::move(curElem);
+            insertPos = (int)myhash(toInsert, (int)curHash);
+            evicted = false;
 
-            for (int count = 0; count < COUNT_LIMIT; ++count)
+            if (isActive(insertPos))
             {
-                // Look for an available position using all hash functions
-                for (int i = 0; i < numHashFunctions_; ++i)
-                {
-                    pos = myhash(xx, i);
-
-                    if (!isActive(pos))
-                    {
-                        entries_[pos] = std::move(HashEntry{ std::move(xx), true });
-                        ++currentSize;
-                        return true;
-                    }
-                }
-
-                // None of the spots is available. Try to evict a random one
-                // (in one of the spots xx can go into)
-                int i = 0;
-                do
-                {
-                    pos = myhash(xx, r.nextInt(numHashFunctions));
-                } while (pos == lastPos && i++ < 5);
-
-                lastPos = pos;
-                std::swap(std::move(xx), entries_[pos].element);
+                curHash = curHash == 0 ? 1 : 0;
+                curTable = curTable == 0 ? 1 : 0;
+                curElem = std::move(entries_[insertPos].element);
+                evictions++;
+                evicted = true;
             }
+            entries_[insertPos].element = std::move(toInsert);
+            entries_[insertPos].isActive = true;
+        } while (evicted && evictions < EVICTION_LIMIT);
 
-            // Only rehash if we've tried below the number of allowed rehashes
-            if (++rehashes > ALLOWED_REHASHES)
+        if (evictions == EVICTION_LIMIT)
+        {
+            if (++rehashes_ < ALLOWED_REHASHES)
             {
-                expand(); // Make the table bigger
-                rehashes_ = 0; // Reset the # of rehashes
+                rehash();
             }
             else
-                rehash(); // Same table size, new hash functions
+            {
+                expand();
+                rehashes_ = 0;
+            }
+
+            // Pretty bad luck if we end up in infinite recursion
+            insertHelper1(std::move(curElem));
+            return false;
         }
+        return true;
     }
+
     bool isActive(int currentPos) const
     {
         return entries_[currentPos].isActive;
     }
 
-    // Get the hash value for x using the specified hash function
-    std::size_t myhash(const AnyType & x, int which) const
-    {
-        return hashFunctions_.hash(x, which) % entries_.size();
-    }
-
     int findPos(const AnyType & x) const
     {
-        for (int i = 0; i < numHashFunctions; ++i)
-        {
-            int pos = myhash(x, i);
-            
-            if (isActive(pos) && entries_[pos].element == x)
-                return pos;
-        }
-        
-        return -1;
+        std::uint64_t pos0 = myhash(x, 0);
+        std::uint64_t pos1 = myhash(x, 1);
+
+        if (isActive((int)pos0) && entries_[pos0].element == x)      return (int)pos0;
+        else if (isActive((int)pos1) && entries_[pos1].element == x) return (int)pos1;
+        else                                                         return -1;
     }
 
     void expand()
     {
-        // Shouldn't this be currentSize_ / MAX_LOAD?
-        // I guess it's more or less the same thing since that's when we'd be testing it
-        rehash(static_cast<int>(entries_.size() / MAX_LOAD));
+        rehash(static_cast<int>(tableSize_ / MAX_LOAD));
     }
     
-    void rehash()
+    std::uint64_t myhash(const AnyType& x, int which) const
     {
-        hashFunctions.generateNewFunctions();
-        rehash(elements_.size());
+        if (which == 0)
+        {
+            return hashFunctions_.hash(x, 0) % tableSize_;
+        }
+        else
+        {
+            return hashFunctions_.hash(x, 1) % tableSize_ + tableSize_;
+        }
     }
 
-    void rehash(int newSize)
+    void rehash()
     {
-        vector<HashEntry> oldArray = entries_;
-        
-        // Create new double-sized, empty table
-        entries_.resize(nextPrime(newSize));
+        hashFunctions_.regenerate();
+        rehash(entries_.size());
+    }
+
+    void rehash(std::size_t newSize)
+    {
+        std::vector<HashEntry> oldArray = entries_;
+        tableSize_ = nextPrime(newSize);
+
+        entries_.resize(tableSize_ * 2);
         for (auto & entry : entries_)
             entry.isActive = false;
        
-       // Copy table over
-       currentSize_ = 0;
-       for (auto & entry : oldArray)
+        // Copy table over
+        currentSize_ = 0;
+        for (auto & entry : oldArray)
             if (entry.isActive)
                 insert(std::move(entry.element));
     }
 
-    static const double MAX_LOAD = 0.40;
-    static const int ALLOWED_REHASHES = 5;
-    vector<HashEntry> entries_;
+    static const int ALLOWED_REHASHES = 2;
+    std::size_t tableSize_;
+    std::vector<HashEntry> entries_;
     std::size_t currentSize_;
     std::size_t numHashFunctions_;
     std::size_t rehashes_;
-    int random_;
     HashFamily hashFunctions_;
 
     // See http://stackoverflow.com/questions/4475996/given-prime-number-n-compute-the-next-prime#answer-5694432
