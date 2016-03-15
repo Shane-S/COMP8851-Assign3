@@ -24,6 +24,7 @@ int GameScreen::Load()
 
 	_camera = new Camera(SDL2pp::Point(0, 0), viewportSize, _level->GetLevelSize());
 
+    // Generate a bunch of squares with random speeds and start positions
     std::shared_ptr<SDL2pp::Texture> square(new SDL2pp::Texture(_mgr->GetRenderer(), "./Assets/Square.png"));
     for (int i = 0; i < 100; ++i)
     {
@@ -35,9 +36,9 @@ int GameScreen::Load()
         _level->AddActor(actor);
     }
 
-    // Inialize the quadtree
-    //_levelQuadtree = std::make_shared<Quadtree>();
-    //_levelQuadtree->Initialize(4, levelSize.GetX(), levelSize.GetY());
+    _quadtree = std::shared_ptr<Quadtree>(new Quadtree(0, SDL2pp::Rect(SDL2pp::Point(0, 0), viewportSize)));
+
+    _font = std::shared_ptr<SDL2pp::Font>(new SDL2pp::Font("./Assets/BEBAS.ttf", 45));
 
 	return SCREEN_LOAD_SUCCESS;
 }
@@ -55,6 +56,11 @@ int GameScreen::Update(double elapsedSecs)
         return SCREEN_FINISH;
     }
 
+    if (_mgr->inputManager->ActionOccurred("TOGGLE_QUAD", Input::Pressed))
+    {
+        _usingQuadtree = !_usingQuadtree;
+    }
+
 	for (auto actor : _level->GetActors())
 	{
 		// A bit hacky, to be sure
@@ -62,7 +68,41 @@ int GameScreen::Update(double elapsedSecs)
 		actor->Update(elapsedSecs);
 	}
 
-    // Naive collision detection for now
+    if (_usingQuadtree)
+        QuadtreeCollisionDetection();
+    else
+        NaiveCollisionDetection();
+
+	_level->Update(elapsedSecs);
+	return SCREEN_CONTINUE;
+}
+
+void GameScreen::QuadtreeCollisionDetection()
+{
+    _quadtree->clear();
+    for (auto actor : _level->GetActors())
+    {
+        _quadtree->insert(actor);
+    }
+    std::vector<std::shared_ptr<Actor>> tempList;
+    tempList.reserve(_level->GetActors().size() / 2);
+    for (auto & actor : _level->GetActors())
+    {
+        _quadtree->retrieve(tempList, actor);
+        for (auto & retrieved : tempList)
+        {
+            if (actor->GetAABB().CheckCollision(retrieved->GetAABB()))
+            {
+                actor->OnOverlap(*retrieved);
+                retrieved->OnOverlap(*actor);
+            }
+        }
+        tempList.clear();
+    }
+}
+
+void GameScreen::NaiveCollisionDetection()
+{
     for (auto it = _level->GetActors().begin(); it != _level->GetActors().end(); it++)
     {
         for (auto it2 = it + 1; it2 != _level->GetActors().end(); it2++)
@@ -74,15 +114,15 @@ int GameScreen::Update(double elapsedSecs)
             }
         }
     }
-
-	_level->Update(elapsedSecs);
-	return SCREEN_CONTINUE;
 }
 
 void GameScreen::Draw()
 {
+    std::string text = _usingQuadtree ? "Quadtree" : "Naive";
+    SDL2pp::Texture quadtreeUsageMsg(_mgr->GetRenderer(), _font->RenderText_Solid(text, SDL_Color{ 0, 0, 0, 255 }));
+
 	SDL2pp::Renderer& rend = _mgr->GetRenderer();
-	rend.SetDrawColor(100, 100, 100, 255);
+	rend.SetDrawColor(79, 206, 229, 255);
 	rend.Clear();
 
 	// Draw all actors
@@ -91,6 +131,7 @@ void GameScreen::Draw()
 		actor->Draw(*_camera);
 	}
 
+    rend.Copy(quadtreeUsageMsg, SDL2pp::NullOpt, SDL2pp::Point(5, 5));
 	rend.Present();
 }
 

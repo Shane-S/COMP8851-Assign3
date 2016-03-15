@@ -94,6 +94,7 @@ private:
 		inputManager->AddKeyToMap("ARROWLEFT", Input::InputAction(SDL_SCANCODE_LEFT));
 		inputManager->AddKeyToMap("ARROWRIGHT", Input::InputAction(SDL_SCANCODE_RIGHT));
 		inputManager->AddKeyToMap("SKIP", Input::InputAction(SDL_SCANCODE_TAB));
+        inputManager->AddKeyToMap("TOGGLE_QUAD", Input::InputAction(SDL_SCANCODE_Q));
 	}
 
 	/**

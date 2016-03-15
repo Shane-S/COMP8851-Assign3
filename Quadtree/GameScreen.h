@@ -8,7 +8,7 @@
 #include "Level.h"
 #include "SpriteSheet.h"
 #include "Actor.h"
-#include "Quadtree.hpp"
+#include "Quadtree.h"
 
 #define NUM_MENU_ITEMS 3
 
@@ -22,7 +22,7 @@ public:
 	///<param name="backgroundPath"> Path to the file containing the background image.</param>
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	GameScreen()
-        : _paused(false) {}
+        : _paused(false),  _usingQuadtree(false) {}
 
 	virtual int Load();
 	virtual int Update(double elapasedSecs) override;
@@ -40,13 +40,17 @@ public:
 	std::shared_ptr<Level> GetLevel() const;
     
 protected:
-	std::string _backgroundPath;
+    void NaiveCollisionDetection();
+    void QuadtreeCollisionDetection();
+
+    std::shared_ptr<SDL2pp::Font> _font;
 
 	bool _paused;
 	Camera* _camera;
 	GameManager* _mgr;
 	std::shared_ptr<Level> _level;
-	std::shared_ptr<Quadtree<Actor>> _levelQuadtree;
+	std::shared_ptr<Quadtree> _quadtree;
+    bool _usingQuadtree;
 };
 
 #endif

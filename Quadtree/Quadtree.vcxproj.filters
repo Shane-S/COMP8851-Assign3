@@ -45,10 +45,10 @@
     <ClInclude Include="Vector2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Quadtree.hpp">
+    <ClInclude Include="SquareActor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SquareActor.h">
+    <ClInclude Include="Quadtree.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -84,6 +84,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SquareActor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Quadtree.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
