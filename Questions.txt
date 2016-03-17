@@ -1,7 +1,15 @@
 Questions
 =========
+1. (6.5)
+See BinaryHeap.hpp.
+
 2. (7.12)
 Heapsort always runs in O(n * logn), so the running time on already-sorted input is O(n * logn).
+
+3. (5.4)
+If we re-hash to a large table when there are twice as many elements as the table size (load factor
+= 2), we'd want to wait until that table is less than half-empty (load factor < 1) before re-hashing
+to a table half its size (otherwise we'd need to immediately re-hash to the larger table).
 
 4. (6.38)
 To decrease all the keys in constant time, a variable holding delta can be added to the heap and
@@ -13,3 +21,8 @@ Every vertex except for F can reach any other vertex in the graph, so the first 
 component consists of A, B, C, D, E, and G. F is the other strongly connected component, since it's
 possible to get to F from F.
 
+6. (5.25)
+See CuckooHashTable.hpp.
+
+7.
+See the Quadtree project.
