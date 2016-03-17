@@ -1,11 +1,12 @@
 #include <limits>
 #include <random>
+#include <chrono>
 #include "GameScreen.h"
 #include "GameManager.h"
 #include "SquareActor.h"
 #include "Vector2.h"
 
-#define MAX_SPEED 1
+#define MAX_SPEED 400
 
 std::shared_ptr<Level> GameScreen::GetLevel() const
 {
@@ -24,9 +25,12 @@ int GameScreen::Load()
 
 	_camera = new Camera(SDL2pp::Point(0, 0), viewportSize, _level->GetLevelSize());
 
+    auto now = std::chrono::high_resolution_clock::now();
+    std::srand((unsigned int)now.time_since_epoch().count());
+
     // Generate a bunch of squares with random speeds and start positions
     std::shared_ptr<SDL2pp::Texture> square(new SDL2pp::Texture(_mgr->GetRenderer(), "./Assets/Square.png"));
-    for (int i = 0; i < 11; ++i)
+    for (int i = 0; i < 4000; ++i)
     {
         std::unordered_map<std::string, std::shared_ptr<SpriteSheet>> sprites;
         sprites["square"] = std::shared_ptr<SpriteSheet>(new SpriteSheet(square, 1, std::numeric_limits<double>::infinity(), false));
@@ -36,7 +40,8 @@ int GameScreen::Load()
         _level->AddActor(actor);
     }
 
-    _quadtree = std::shared_ptr<Quadtree>(new Quadtree(1, SDL2pp::Rect(SDL2pp::Point(0, 0), viewportSize)));
+    _quadtree = std::shared_ptr<Quadtree>(new Quadtree(1, SDL2pp::Rect(SDL2pp::Point(0, 0), viewportSize), nullptr));
+    candidates_.reserve(_level->GetActors().size());
 
     _font = std::shared_ptr<SDL2pp::Font>(new SDL2pp::Font("./Assets/BEBAS.ttf", 45));
 
@@ -63,8 +68,6 @@ int GameScreen::Update(double elapsedSecs)
 
 	for (auto actor : _level->GetActors())
 	{
-		// A bit hacky, to be sure
-		if (actor->GetType() == Actor::Type::player) continue;
 		actor->Update(elapsedSecs);
 	}
 
@@ -79,25 +82,31 @@ int GameScreen::Update(double elapsedSecs)
 
 void GameScreen::QuadtreeCollisionDetection()
 {
-    _quadtree->clear();
-    for (auto actor : _level->GetActors())
+    if (!_builtTree)
     {
-        _quadtree->insert(actor);
+        for (auto actor : _level->GetActors())
+        {
+            _quadtree->insert(actor);
+        }
+        _builtTree = true;
     }
-    std::vector<std::shared_ptr<Actor>> tempList;
-    tempList.reserve(_level->GetActors().size() / 2);
+    else
+    {
+        _quadtree->update();
+    }
+
     for (auto & actor : _level->GetActors())
     {
-        _quadtree->retrieve(tempList, actor);
-        for (auto & retrieved : tempList)
+        _quadtree->retrieve(candidates_, actor);
+        for (auto & retrieved : candidates_)
         {
-            if (actor->GetAABB().CheckCollision(retrieved->GetAABB()))
+            if (actor->_aabb.CheckCollision((*retrieved)->_aabb))
             {
-                actor->OnOverlap(*retrieved);
-                retrieved->OnOverlap(*actor);
+                actor->OnOverlap(**retrieved);
+                (*retrieved)->OnOverlap(*actor);
             }
         }
-        tempList.clear();
+        candidates_.clear();
     }
 }
 
@@ -130,7 +139,7 @@ void GameScreen::Draw()
 	{
 		actor->Draw(*_camera);
 	}
-    _quadtree->draw(_mgr);
+    
     rend.Copy(quadtreeUsageMsg, SDL2pp::NullOpt, SDL2pp::Point(5, 5));
 	rend.Present();
 }

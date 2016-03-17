@@ -22,7 +22,7 @@ public:
 	///<param name="backgroundPath"> Path to the file containing the background image.</param>
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 	GameScreen()
-        : _paused(false),  _usingQuadtree(false) {}
+        : _paused(false),  _usingQuadtree(false), _builtTree(false) {}
 
 	virtual int Load();
 	virtual int Update(double elapasedSecs) override;
@@ -50,7 +50,9 @@ protected:
 	GameManager* _mgr;
 	std::shared_ptr<Level> _level;
 	std::shared_ptr<Quadtree> _quadtree;
+    std::vector<std::shared_ptr<Actor>*> candidates_;
     bool _usingQuadtree;
+    bool _builtTree;
 };
 
 #endif

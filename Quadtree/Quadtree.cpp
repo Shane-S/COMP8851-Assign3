@@ -8,21 +8,35 @@ const int Quadtree::DIVIDE_THRESHOLD = 10;
 #define IDX_2 0x00010000
 #define IDX_3 0x01000000
 
-void Quadtree::insert(std::shared_ptr<Actor> actor)
+Quadtree::Quadtree(int level, SDL2pp::Rect bounds, Quadtree* parent) :
+    level_(level), bounds_(bounds), children_(), actors_(), parent_(parent)
 {
+    children_.reserve(4);
+    for (int i = 0; i < 4; i++) children_.push_back(nullptr);
+    removed_.reserve(DIVIDE_THRESHOLD);
+    reinserted_.reserve(DIVIDE_THRESHOLD);
+}
+
+void Quadtree::insert(std::shared_ptr<Actor>& actor)
+{
+    removed_.clear();
     if (children_[0] != nullptr)
     {
         std::uint32_t indices = getChildIndices(actor);
         int idx = getChildIndex(indices);
-        if (idx != -1) children_[idx]->insert(actor);
-        return;
+        if (idx != -1)
+        {
+            children_[idx]->insert(actor);
+            return;
+        }
     }
 
     actors_.push_back(actor);
     if (actors_.size() > DIVIDE_THRESHOLD && level_ < MAX_LEVELS)
     {
-        split();
-        std::vector<std::shared_ptr<Actor>> removed;
+        if(children_[0] == nullptr)
+            split();
+
         for(auto & a : actors_)
         {
             std::uint32_t indices = getChildIndices(a);
@@ -30,14 +44,60 @@ void Quadtree::insert(std::shared_ptr<Actor> actor)
             if (idx != -1)
             {
                 children_[idx]->insert(a);
-                removed.push_back(a);
             }
         }
 
         // Get rid of any moved items
-        auto removedFinder = [&](auto& a) {return std::find(removed.begin(), removed.end(), a) != removed.end(); };
+        auto removedFinder = [&](auto& a) {return std::find(removed_.begin(), removed_.end(), &a) != removed_.end(); };
         actors_.erase(std::remove_if(actors_.begin(), actors_.end(), removedFinder), actors_.end());
     }
+}
+
+void Quadtree::update()
+{
+    reinserted_.clear();
+    removed_.clear();
+    if (children_[0] != nullptr)
+    {
+        children_[0]->update();
+        children_[1]->update();
+        children_[2]->update();
+        children_[3]->update();
+    }
+    if (parent_ == nullptr) return;
+
+    for (auto & actor : reinserted_)
+    {
+        std::uint32_t indices = getChildIndices(actor);
+        int idx = getChildIndex(indices);
+        if (idx != -1)
+        {
+            children_[idx]->insert(actor);
+            return;
+        }
+        else
+        {
+            actors_.push_back(actor);
+        }
+    }
+
+    for (auto & actor : actors_)
+    {
+        AABB &aabb = actor->_aabb;
+        SDL2pp::Rect rect(aabb.GetX(), aabb.GetY(), aabb.GetWidth(), aabb.GetHeight());
+        if (!bounds_.Contains(rect))
+        {
+            removed_.push_back(&actor);
+        }
+    }
+
+    for (auto pa : removed_)
+    {
+        parent_->reinsert(*pa);
+    }
+
+    auto removedFinder = [&](auto& a) {return std::find(removed_.begin(), removed_.end(), &a) != removed_.end(); };
+    actors_.erase(std::remove_if(actors_.begin(), actors_.end(), removedFinder), actors_.end());
 }
 
 void Quadtree::clear()
@@ -59,13 +119,13 @@ void Quadtree::split()
     int childW = bounds_.w / 2;
     int childH = bounds_.h / 2;
 
-    children_[0] = std::shared_ptr<Quadtree>(new Quadtree(level_ + 1, SDL2pp::Rect(bounds_.x, bounds_.y, childW, childH)));
-    children_[1] = std::shared_ptr<Quadtree>(new Quadtree(level_ + 1, SDL2pp::Rect(bounds_.x, bounds_.y + childH, childW, childH)));
-    children_[2] = std::shared_ptr<Quadtree>(new Quadtree(level_ + 1, SDL2pp::Rect(bounds_.x + childW, bounds_.y + childH, childW, childH)));
-    children_[3] = std::shared_ptr<Quadtree>(new Quadtree(level_ + 1, SDL2pp::Rect(bounds_.x + childW, bounds_.y, childW, childH)));
+    children_[0] = std::shared_ptr<Quadtree>(new Quadtree(level_ + 1, SDL2pp::Rect(bounds_.x, bounds_.y, childW, childH), this));
+    children_[1] = std::shared_ptr<Quadtree>(new Quadtree(level_ + 1, SDL2pp::Rect(bounds_.x, bounds_.y + childH, childW, childH), this));
+    children_[2] = std::shared_ptr<Quadtree>(new Quadtree(level_ + 1, SDL2pp::Rect(bounds_.x + childW, bounds_.y + childH, childW, childH), this));
+    children_[3] = std::shared_ptr<Quadtree>(new Quadtree(level_ + 1, SDL2pp::Rect(bounds_.x + childW, bounds_.y, childW, childH), this));
 }
 
-void Quadtree::retrieve(std::vector<std::shared_ptr<Actor>>& list, std::shared_ptr<Actor>& actor) const
+void Quadtree::retrieve(std::vector<std::shared_ptr<Actor>*>& list, std::shared_ptr<Actor>& actor)
 {
     std::uint32_t indices = getChildIndices(actor);
 
@@ -79,7 +139,7 @@ void Quadtree::retrieve(std::vector<std::shared_ptr<Actor>>& list, std::shared_p
     
     for (auto & a : actors_)
     {
-        if (a != actor) list.push_back(a);
+        if (a != actor) list.push_back(&a);
     }
 }
 
@@ -104,7 +164,7 @@ void Quadtree::draw(GameManager * mgr)
         rend.SetScale(2, 2);
         rend.SetDrawColor(10 * level_, 10 * level_, 10 * level_, 255);
         rend.DrawRect(bounds_);
-        SDL_RenderSetScale(rend.Get(), 1, 1);
+        rend.SetScale(1, 1);
     }
     if (children_[0] != nullptr)
     {
@@ -115,40 +175,53 @@ void Quadtree::draw(GameManager * mgr)
     }
 }
 
+void Quadtree::reinsert(std::shared_ptr<Actor>& actor)
+{
+    reinserted_.push_back(actor);
+}
+
 std::uint32_t Quadtree::getChildIndices(const SDL2pp::Rect& rect) const
 {
-    int midpointX = bounds_.x + (bounds_.w / 2);
-    int midpointY = bounds_.y + (bounds_.h / 2);
+    int midpointX = bounds_.x + (bounds_.w >> 1);
+    int midpointY = bounds_.y + (bounds_.h >> 1);
 
     std::uint32_t indices = 0x01010101;
 
-    if (rect.y > bounds_.y && (rect.y + rect.h) < midpointY)
+    static const unsigned int cases[] =
     {
-        indices &= ~IDX_1;
-        indices &= ~IDX_2;
+        ~(IDX_1 | IDX_2),
+        ~(IDX_0 | IDX_3),
+        ~(IDX_3 | IDX_2),
+        ~(IDX_1 | IDX_0)
+    };
+    int top = rect.y;
+    int bottom = rect.y + rect.h;
+    int left = rect.x;
+    int right = rect.x + rect.w;
+
+    if (top >= bounds_.y && bottom <= midpointY)
+    {
+        indices &= cases[0];
     }
-    else if (rect.y > midpointY && (rect.y + rect.h) < (bounds_.y + bounds_.h))
+    else if (top >= midpointY && bottom <= (bounds_.y + bounds_.h))
     {
-        indices &= ~IDX_0;
-        indices &= ~IDX_3;
+        indices &= cases[1];
     }
 
-    if (rect.x > bounds_.x && (rect.x + rect.w) < midpointX)
+    if (left >= bounds_.x && right <= midpointX)
     {
-        indices &= ~IDX_3;
-        indices &= ~IDX_2;
+        indices &= cases[2];
     }
-    else if (rect.x > midpointX && (rect.x + rect.w) < (bounds_.x + bounds_.w))
+    else if (left >= midpointX && right <= (bounds_.x + bounds_.w))
     {
-        indices &= ~IDX_0;
-        indices &= ~IDX_1;
+        indices &= cases[3];
     }
     return indices;
 }
 
 std::uint32_t Quadtree::getChildIndices(const std::shared_ptr<Actor>& a) const
 {
-    AABB aabb = a->GetAABB();
+    AABB &aabb = a->_aabb;
     SDL2pp::Rect rect(aabb.GetX(), aabb.GetY(), aabb.GetWidth(), aabb.GetHeight());
     return getChildIndices(rect);
 }

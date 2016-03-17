@@ -219,6 +219,8 @@ public:
      */
     virtual void OnOverlap(Actor& other);
 
+    AABB _aabb;
+
 protected:
 
 	// TEMPORARY struct to hold actor bounds while I figure out something more elegant (it's probably going to stay forever though)
@@ -234,8 +236,6 @@ protected:
 	KinematicState _prevKinematic;
 
     SDL_Color _colourMod;
-
-	AABB _aabb;
 
 	std::string _currentSpriteSheet;	
 	std::unordered_map<std::string, std::shared_ptr<SpriteSheet>> _sprites;
